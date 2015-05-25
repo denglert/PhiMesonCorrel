@@ -3,10 +3,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <TFile.h>
+#include <TLorentzVector.h>
 #include "AnalysisFW.h"
 #include "AnalysisBinning.h"
 #include "PIDUtils.h"
 #include "SetupCustomTrackTree.h"
+
+const double massA = 0.493677;
+const double massB = 0.493677;
 
 const int nMixEv = 10;
 
@@ -19,15 +23,16 @@ const double maxtrkCorr2 = 999;
 /////////////////////////////
 // *** EventData class *** //
 /////////////////////////////
-void EventData::AddTrack(const track& p) { tracks.push_back(p); }
-int  EventData::GetnTracks () { return tracks.size(); }
+void EventData::AddTrack(const track& p) { tracks.push_back(p); };
+void EventData::AddPhi  (const phi& p)   {   phis.push_back(p); };
+int  EventData::GetnTracks () { return tracks.size(); };
 
-void EventData::SetzVtx(float zVtx_) { zVtx = zVtx_; }
-void EventData::SetnTrk(int nTrk_) { nTrk  = nTrk_; }
+void EventData::SetzVtx(float zVtx_) { zVtx = zVtx_; };
+void EventData::SetnTrk(int nTrk_) { nTrk  = nTrk_; };
 
-int EventData::GetzVtxBin()         { return zvtxbin(zVtx, nZvtxBins_); }
-int EventData::GetMultiplicityBin_Ana( int nMultiplicityBins_Ana) { int bin = multiplicitybin_Ana(nTrk, nMultiplicityBins_Ana); return bin;}
-int EventData::GetMultiplicityBin_EvM() { return multiplicitybin_EvM(nTrk); }
+int EventData::GetzVtxBin()         { return zvtxbin(zVtx, nZvtxBins_); };
+int EventData::GetMultiplicityBin_Ana( int nMultiplicityBins_Ana) { int bin = multiplicitybin_Ana(nTrk, nMultiplicityBins_Ana); return bin;};
+int EventData::GetMultiplicityBin_EvM() { return multiplicitybin_EvM(nTrk); };
 
 ///////////////////////
 // - trackWeight
@@ -80,16 +85,17 @@ void LogFile::Close()
 void EventData::Clear(int nCorrTyp, int *nPtBins)
 {
 	tracks.clear();
+	phis.clear();
 	zVtx=50;
 	nTrk=-1;
 
 	for(int TypBin=0; TypBin < nCorrTyp; TypBin++)
 	for(int ptBin=0; ptBin < nPtBins[TypBin]; ptBin++)
 	{
-		nTriggerParticles[TypBin][ptBin] = 0; 
+		nTriggerParticles[TypBin][ptBin] = 0.0; 
 	}
 
-	nTriggerParticles_cpar_ref = 0;
+	nTriggerParticles_cpar_ref = 0.0;
 }
 
 
@@ -206,9 +212,10 @@ bool mTrackSelection_c( const Tracks_c &tTracks, int iTrk )
 
 
 // ReadInDATA
-void EventData::ReadInDATA( const Tracks &tTracks, PIDUtil *pidutil, TrackCorr *trkCorr)
+void EventData::ReadInDATA( const Tracks &tTracks, PIDUtil *pidutil, TrackCorr *trkCorr, TH1D ***spectrum)
 {
 
+	int multBin = EventData::GetMultiplicityBin_Ana( nMultiplicityBins_Ana_HDR );
 	int nTrk = tTracks.nTrk;
 
 	for (int iTrk = 0; iTrk < nTrk; iTrk++)
@@ -222,98 +229,135 @@ void EventData::ReadInDATA( const Tracks &tTracks, PIDUtil *pidutil, TrackCorr *
 		float phi = tTracks.trkPhi[iTrk];
 
   		track trk;
-		trk.pid 		 = pidutil->GetID( tTracks, iTrk);
-		trk.ptBin_CH = ptbin(       0 , pt );
-		trk.IsPID = false;
-		if ( trk.pid != 99 )
-		{
-		 trk.ptBin_ID = ptbin( trk.pid , pt );
-		 trk.IsPID    = ( trk.ptBin_ID != -1 );
-		 trk.w  = trkCorr->trackWeight( trk.pid, pt, eta, phi); 
-		}
+		trk.IsKaon = pidutil->IsKaon( tTracks, iTrk );
+
+		trk.w  = trkCorr->trackWeight( 2, pt, eta, phi); 
 
 		trk.IsInsideReferencePtRange = ( (ptref1 < pt) && ( pt < ptref2 ));
-		trk.IsInsideChParticlPtRange = ( trk.ptBin_CH != -1 );
-		if ( !trk.IsInsideChParticlPtRange && !trk.IsInsideReferencePtRange && !trk.IsPID ) continue;
 
-		trk.w0 = trkCorr->trackWeight(     0  , pt, eta, phi); 
+		if ( !trk.IsInsideReferencePtRange && !trk.IsKaon ) continue;
+
+		trk.w0 = trkCorr->trackWeight( 0  , pt, eta, phi); 
 		
   		// Track fill up
   		trk.charge  = tTracks.trkCharge[iTrk];
   		trk.phi     = phi;
   		trk.eta     = eta;
+  		trk.pt      = pt;
 
 		// *** Track selection *** //
 		EventData::AddTrack(trk);
 
-		// chadron
-		if( trk.IsInsideChParticlPtRange )
-		{ nTriggerParticles[0][ trk.ptBin_CH ] += trk.w0; }
- 
 		// reference
 		if ( trk.IsInsideReferencePtRange )
 		{ nTriggerParticles_cpar_ref += trk.w0; }
 
-		// pid particle
-		if( trk.IsPID )
-		{ nTriggerParticles[ trk.pid ][ trk.ptBin_ID ] += trk.w; }
+	}
 
+	TLorentzVector *v1 = new TLorentzVector;
+	TLorentzVector *v2 = new TLorentzVector;
+
+	int nTrk_c = tracks.size();
+
+	for (int iTrk = 0; iTrk < nTrk_c; iTrk++)
+	{
+
+		if (! tracks[iTrk].IsKaon ) continue;
+
+		for (int jTrk = (iTrk+1); jTrk < nTrk_c; jTrk++)
+		{
+
+			if ( !tracks[jTrk].IsKaon ) continue;
+			short int charge_prod = tracks[iTrk].charge * tracks[jTrk].charge;
+			if ( charge_prod == 1) continue;
+
+			v1->SetPtEtaPhiM( tracks[iTrk].pt, tracks[iTrk].eta, tracks[iTrk].phi, massA ); 
+			v2->SetPtEtaPhiM( tracks[jTrk].pt, tracks[jTrk].eta, tracks[jTrk].phi, massB );
+
+			TLorentzVector sum = (*v1) + (*v2);
+			double mass = sum.M();
+			double pt   = sum.Pt();
+
+			short int massBin = massbin( mass );
+			short int ptBin   =   ptbin( 0, pt );
+
+			if ( ptBin == -1 ) continue;
+
+			float ww = tracks[iTrk].w * tracks[jTrk].w;
+			spectrum[ptBin][multBin]->Fill( mass, ww );
+
+			if ( massBin == -1 ) continue;
+
+			phi phicand;
+			phicand.typ   = massBin;
+			phicand.w     = ww;
+			phicand.phi   = sum.Phi(); 
+			phicand.eta   = sum.Eta(); 
+			phicand.ptBin = ptBin; 
+			phicand.trkA  = iTrk; 
+			phicand.trkB  = jTrk; 
+
+			EventData::AddPhi(phicand);
+
+			nTriggerParticles[ massBin ][ ptBin ] += ww;
+
+		}
 	}
 
 }
 
 // ReadInMC
-void EventData::ReadInMC( Particles &tTracks, PIDUtil *pidutil )
-{
-	int nPart = tTracks.nParticle;
-
-	for (int iPar = 0; iPar < nPart; iPar++)
-	{
-
-		float pt  = tTracks.pPt [iPar];
-		float eta = tTracks.pEta[iPar];
-		float phi = tTracks.pPhi[iPar];
-
-  		track part;
-		part.pid = pidutil->GetIDgenPart_trkCorr( tTracks, iPar);
-		part.ptBin_CH = ptbin(   0 , tTracks.pPt[iPar]);
-		part.IsPID = false;
-		if ( part.pid != 99 )
-		{
-		 part.ptBin_ID = ptbin( part.pid , pt );
-		 part.IsPID    = ( part.ptBin_ID != -1 );
-		}
-
-
-		part.IsInsideReferencePtRange = ( (ptref1 < pt) && ( pt < ptref2 ));
-		part.IsInsideChParticlPtRange = ( part.ptBin_CH != -1 );
-		if ( !part.IsInsideChParticlPtRange && !part.IsInsideReferencePtRange && !part.IsPID ) continue;
-
-		// *** Track selection *** //
-		
-  		// Track fill up
-  		part.phi     = tTracks.pPhi[iPar];
-  		part.eta     = tTracks.pEta[iPar];
-		part.w0 		 = 1;
-		part.w 		 = 1;
-
-		EventData::AddTrack(part);
-
-		// chadron
-		if( part.IsInsideChParticlPtRange )
-		{ nTriggerParticles[0][ part.ptBin_CH ]++; }
- 
-		// reference
-		if ( part.IsInsideReferencePtRange )
-		{ nTriggerParticles_cpar_ref++; }
-
-		// pid particle
-		if( part.IsPID )
-		{ nTriggerParticles[ part.pid ][ part.ptBin_ID ]++; }
-
-	}
-
-}
+//void EventData::ReadInMC( Particles &tTracks, PIDUtil *pidutil )
+//{
+//	int nPart = tTracks.nParticle;
+//
+//	for (int iPar = 0; iPar < nPart; iPar++)
+//	{
+//
+//		float pt  = tTracks.pPt [iPar];
+//		float eta = tTracks.pEta[iPar];
+//		float phi = tTracks.pPhi[iPar];
+//
+//  		track part;
+//		part.pid = pidutil->GetIDgenPart_trkCorr( tTracks, iPar);
+//		part.ptBin_CH = ptbin(   0 , tTracks.pPt[iPar]);
+//		part.IsPID = false;
+//		if ( part.pid != 99 )
+//		{
+//		 part.ptBin_ID = ptbin( part.pid , pt );
+//		 part.IsPID    = ( part.ptBin_ID != -1 );
+//		}
+//
+//
+//		part.IsInsideReferencePtRange = ( (ptref1 < pt) && ( pt < ptref2 ));
+//		part.IsInsideChParticlPtRange = ( part.ptBin_CH != -1 );
+//		if ( !part.IsInsideChParticlPtRange && !part.IsInsideReferencePtRange && !part.IsPID ) continue;
+//
+//		// *** Track selection *** //
+//		
+//  		// Track fill up
+//  		part.phi     = tTracks.pPhi[iPar];
+//  		part.eta     = tTracks.pEta[iPar];
+//		part.w0 		 = 1;
+//		part.w 		 = 1;
+//
+//		EventData::AddTrack(part);
+//
+//		// chadron
+//		if( part.IsInsideChParticlPtRange )
+//		{ nTriggerParticles[0][ part.ptBin_CH ]++; }
+// 
+//		// reference
+//		if ( part.IsInsideReferencePtRange )
+//		{ nTriggerParticles_cpar_ref++; }
+//
+//		// pid particle
+//		if( part.IsPID )
+//		{ nTriggerParticles[ part.pid ][ part.ptBin_ID ]++; }
+//
+//	}
+//
+//}
 
 ////////////////////////////
 // *** Setup function *** //
@@ -445,12 +489,14 @@ void prepareDIR( std::string tag )
 
  std::string correl2Ddir 	 	 = "./results/"+tag+"/correl2D/";
  std::string correl1Ddir 	 	 = "./results/"+tag+"/correl1D/";
+ std::string spectrumdir 	 	 = "./results/"+tag+"/spectrum/";
  std::string v2vsptdir 	 	 	 = "./results/"+tag+"/v2/";
  std::string v3vsptdir 	 	 	 = "./results/"+tag+"/v3/";
  std::string fitlogdir 			 = "./results/"+tag+"/fit/";
 
  mkdir( correl2Ddir.c_str(),  	 0755 );
  mkdir( correl1Ddir.c_str(),  	 0755 );
+ mkdir( spectrumdir.c_str(),    	 0755 );
  mkdir( v2vsptdir.c_str(),    	 0755 );
  mkdir( v3vsptdir.c_str(),    	 0755 );
  mkdir( fitlogdir.c_str(), 0755 );

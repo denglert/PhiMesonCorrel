@@ -16,6 +16,8 @@
 #include "TLegend.h"
 #include "CorrelationUtils.h"
 #include "ContMatrix.h"
+#include "GraphTools.h"
+
 
 /////////////////////////////////////////
 //                                     //
@@ -49,15 +51,6 @@ void CorrelationFramework::SetupForProcess()
 	std::cout << "Setting up for process." << std::endl;
 	std::cout << "Project tag: " << tag << std::endl;
 
-	if ( DoSelfCorrelation )
-	{
-		Setup_TH2Ds_nCorrnPtnMult( correl2D_self_functi, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D_self", "functi");
-		Setup_TH1Ds_nCorrnPtnMult( correl1D_self, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl1D_self", "");
-		Setup_CorrelResults_nCorrnPtnMult          (correl_Results_self,      nCorrTyp, nPtBins, nMultiplicityBins_Ana);
-		Setup_Correl1DfitResultsData_nCorrnPtnMult (correl1D_FitResults_self, nCorrTyp, nPtBins, nMultiplicityBins_Ana);
-	}
-
-
 	Setup_TH2Ds_nCorrnPtnMult( correl2D_functi, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D"     , "functi");
 
 	Setup_TH2Ds_nCorrnPtnMult( correl2D_signal, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D"     , "true_signal");
@@ -68,7 +61,7 @@ void CorrelationFramework::SetupForProcess()
 	Setup_TH1Ds_nCorrnPtnMult( correl1D, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl1D", "");
 	Setup_TH1Ds_nMult( correl1D_cpar_ref, nMultiplicityBins_Ana, "correl1D", "cpar_ref" );
 
-	Setup_CorrelResults_nCorrnPtnMult          (correl_Results,      nCorrTyp, nPtBins, nMultiplicityBins_Ana);
+	Setup_CorrelResults_CorrPtMult ( );
 	Setup_Correl1DfitResultsData_nCorrnPtnMult (correl1D_FitResults, nCorrTyp, nPtBins, nMultiplicityBins_Ana);
 
 	correl_Results_cpar_ref      = new          CorrelResults  [nMultiplicityBins_Ana];
@@ -81,6 +74,9 @@ void CorrelationFramework::SetupForProcess()
 	f_preproc = new TFile( preprocessed_filename.c_str(), "READ");
  	if ( f_preproc->IsZombie() || (f_preproc == NULL) ) {std::cerr << "Error opening preproc .root file: " << preprocessed_filename << std::endl; exit(-1); }
  	else{ std::cout << Form("TFile %s seems to be loaded.", preprocessed_filename.c_str()) << std::endl; };
+
+	//
+	Read_TH1Ds_PtMult( spectrum, "spectrum" );
 	
 	//
 	Read_TH1Ds_CorrPtMult( nEvents_Processed_signal, "nEvents_Processed_signal" );
@@ -105,6 +101,8 @@ void CorrelationFramework::SetupForProcess()
 		normalizeBynEvents( correl2D_backgr_meas[TypBin][ptBin][multBin], nEvents_Processed_backgr[TypBin][ptBin][multBin]);
 	}
 
+	Setup_spectruminfo_PtMult ( );
+
 }
 
 
@@ -122,6 +120,9 @@ void CorrelationFramework::SetupForPreprocess()
 
 	Setup_correl2D_currev_cpar_ref( correl2D_currev_cpar_ref_signal, "signal", ptref1, ptref2);
 	Setup_correl2D_currev_cpar_ref( correl2D_currev_cpar_ref_backgr, "backgr", ptref1, ptref2);
+
+	//Setup_TH1Ds_PtMult ( spectrum, "spectrum", ";m_{inv} [GeV/c];", nMassBins, massMin, massMax );
+	Setup_TH1Ds_PtMult ( spectrum, "spectrum", ";m_{inv} [GeV/c];", nspectrumBins, spectrumMin, spectrumMax );
 
 	// all event
 	Setup_TH2Ds_CorrPtMult (correl2D_signal, "correl2D_signal", "2D Correlation function;#Delta #eta; #Delta #Phi", ndEtaBins,dEtaMin,dEtaMax,ndPhiBins,dPhiMin,dPhiMax);
@@ -253,13 +254,6 @@ void CorrelationFramework::ReadIn_CorrelationFuncs( TFile *f )
 	ReadIn_TH2Ds_nCorrnPtnMult(f, correl2D_signal_meas, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D", "signal");
 	ReadIn_TH2Ds_nCorrnPtnMult(f, correl2D_backgr_meas, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D", "backgr");
 
-	if ( DoSelfCorrelation )
-	{
-	std::cout << "Starting to read in correl2D self signal and backgr" << std::endl;
-	ReadIn_TH2Ds_nCorrnPtnMult(f, correl2D_self_signal, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D_self", "signal");
-	ReadIn_TH2Ds_nCorrnPtnMult(f, correl2D_self_backgr, nCorrTyp, nPtBins, nMultiplicityBins_Ana, "correl2D_self", "backgr");
-	}
-
 	std::cout << "Starting to read in correl2D cpar signal and backgr" << std::endl;
 	ReadIn_TH2Ds_nMult(f, correl2D_cpar_ref_signal, nMultiplicityBins_Ana, "correl2D", "cpar_ref_signal", ptref1, ptref2);
 	ReadIn_TH2Ds_nMult(f, correl2D_cpar_ref_backgr, nMultiplicityBins_Ana, "correl2D", "cpar_ref_backgr", ptref1, ptref2);
@@ -296,23 +290,65 @@ void CorrelationFramework::Set_dEtacut()
 void CorrelationFramework::SignalCorrelation(EventData *ev)
 {
 
+	int multBin = ev->GetMultiplicityBin_Ana(nMultiplicityBins_Ana);
+
+	// (Phi Meson) - (Charged particle) correlation
+	int nPhis = (*ev).phis.size();
 	int nTrkA = (*ev).tracks.size();
+
+	for ( int iPhi = 0; iPhi < nPhis; iPhi++ ) 
+	{
+
+		short int ptBinp = (*ev).phis[iPhi].ptBin;
+		double ieta = (*ev).phis[iPhi].eta;
+		double iphi = (*ev).phis[iPhi].phi;
+
+		short int ptBin = (*ev).phis[iPhi].ptBin;
+
+		double iw = (*ev).phis[iPhi].w;
+
+		for (int jTrkA = 0; jTrkA < nTrkA; jTrkA++)
+		{
+
+			if ( !(*ev).tracks[jTrkA].IsInsideReferencePtRange ) continue;
+			if ( ((*ev).phis[iPhi].trkA == jTrkA) || ((*ev).phis[iPhi].trkB == jTrkA) ) continue;
+
+			double jeta = (*ev).tracks[jTrkA].eta;
+			double jphi = (*ev).tracks[jTrkA].phi;
+
+			double jw0 = (*ev).tracks[jTrkA].w0;
+			double w  = iw * jw0;
+
+			double dEtaA = dEta( ieta, jeta );
+			double dPhiA = dPhi( iphi, jphi );
+
+			correl2D_currev_signal[ (*ev).phis[iPhi].typ ][ ptBin ]->Fill(dEtaA, dPhiA, w);
+
+		}
+
+	}
+	
+
+
+
+	// nEvents_Processed
+	for(int TypBin=0; TypBin < nCorrTyp; TypBin++)
+	for(int ptBin=0; ptBin < nPtBins[TypBin]; ptBin++)
+	{
+		if ( (*ev).nTriggerParticles[TypBin][ptBin] != 0.0 )
+		{ nEvents_Processed_signal[TypBin][ptBin][multBin]->Fill(1.); }
+	}
+
+	// (Charged particle) - (Charged particle) reference
 	for (int iTrkA = 0; iTrkA < nTrkA; iTrkA++)
 	{
 
-		double iPID = (*ev).tracks[iTrkA].pid;
 		double ieta = (*ev).tracks[iTrkA].eta;
 		double iphi = (*ev).tracks[iTrkA].phi;
 
-		short int ptBin_CH = (*ev).tracks[iTrkA].ptBin_CH;
-		short int ptBin_ID = (*ev).tracks[iTrkA].ptBin_ID;
-
-		bool TriggerIsInsideReferencePtRange = (*ev).tracks[iTrkA].IsInsideReferencePtRange;
-		bool TriggerIsInsideChParticlPtRange = (*ev).tracks[iTrkA].IsInsideChParticlPtRange;
-		bool TriggerIsPID 						 = (*ev).tracks[iTrkA].IsPID;
+		if ( !(*ev).tracks[iTrkA].IsInsideReferencePtRange ) continue;
 
 		double iw0 = (*ev).tracks[iTrkA].w0;
-		double iw  = (*ev).tracks[iTrkA].w;
 
 		for (int jTrkA = 0; jTrkA < nTrkA; jTrkA++)
 		{
@@ -326,42 +362,14 @@ void CorrelationFramework::SignalCorrelation(EventData *ev)
 			double jw0 = (*ev).tracks[jTrkA].w0;
 
 			double w0 = iw0 * jw0;
-			double w;
-
-			if ( TriggerIsPID )
-			{ w  = iw  * jw0; }
 
 			double dEtaA = dEta( ieta, jeta );
 			double dPhiA = dPhi( iphi, jphi );
 
-			// charged particle reference
-			if ( TriggerIsInsideReferencePtRange )
-			{ correl2D_currev_cpar_ref_signal->Fill(dEtaA, dPhiA, w0); }
-
-			// charged particle
-			if ( TriggerIsInsideChParticlPtRange )
-			{ correl2D_currev_signal[ 0 ][ ptBin_CH ]->Fill(dEtaA, dPhiA, w0); }
-
-			if ( maxtrkCorr2 < w ) continue;
-
-			// PID particle
-			if ( TriggerIsPID )
-			{  correl2D_currev_signal[ (*ev).tracks[iTrkA].pid ][ ptBin_ID ]->Fill(dEtaA, dPhiA, w);};
+			correl2D_currev_cpar_ref_signal->Fill(dEtaA, dPhiA, w0);
 		}
-
-
 	}
-
-
-	int multBin = ev->GetMultiplicityBin_Ana(nMultiplicityBins_Ana);
-
-	// nEvents_Processed
-	for(int TypBin=0; TypBin < nCorrTyp; TypBin++)
-	for(int ptBin=0; ptBin < nPtBins[TypBin]; ptBin++)
-	{
-		if ( (*ev).nTriggerParticles[TypBin][ptBin] != 0 )
-		{ nEvents_Processed_signal[TypBin][ptBin][multBin]->Fill(1.); }
-	}
+	
 	
 }
 
@@ -369,7 +377,8 @@ void CorrelationFramework::SignalCorrelation(EventData *ev)
 // - CorrelationFramework::MixedCorrelation( ... )
 void CorrelationFramework::MixedCorrelation( EventData *ev, std::deque< EventData > ***EventCache)
 {
-	int nTrkA = (*ev).tracks.size();
+	int nPhis = (*ev).phis.size();
+	int nTrkA = (*ev).phis.size();
 
 	int nMixEvs = (*EventCache)[ ev->GetMultiplicityBin_EvM() ][ ev->GetzVtxBin() ].size();
 
@@ -386,34 +395,27 @@ void CorrelationFramework::MixedCorrelation( EventData *ev, std::deque< EventDat
 		{ nEvents_Processed_backgr[TypBin][ptBin][multBin_Ana]->Fill(1., nMixEvs); }
 	}
 
+	int EvA_ID = ev->EventID;
+
+	// (Phi Meson) - (Charged particle) correlation
 	for (int iEvB = 0; iEvB < nMixEvs; iEvB++)
 	{ 
 
-		int EvA_ID = ev->EventID;
 		int EvB_ID = (*EventCache)[multBin][zvtxBin][iEvB].EventID;
 
 		if ( EvA_ID == EvB_ID  ) {std::cerr << "Warning! Trying to mix same events in making the background function" << std::endl;} 
 
-		nEvents_Processed_backgr_total->Fill(1.);
-
 		int nTrkB = (*EventCache)[multBin][zvtxBin][iEvB].tracks.size();
 
-		for (int iTrkA = 0; iTrkA < nTrkA; iTrkA++)
+		for (int iPhi = 0; iPhi < nPhis; iPhi++)
 		{
 
-		   double iPID = (*ev).tracks[iTrkA].pid;
-		   double ieta = (*ev).tracks[iTrkA].eta;
-		   double iphi = (*ev).tracks[iTrkA].phi;
+		   double ieta = (*ev).phis[iPhi].eta;
+		   double iphi = (*ev).phis[iPhi].phi;
 
-			short int ptBin_CH = (*ev).tracks[iTrkA].ptBin_CH;
-			short int ptBin_ID = (*ev).tracks[iTrkA].ptBin_ID;
+			short int ptBin = (*ev).phis[iPhi].ptBin;
 
- 			bool TriggerIsInsideReferencePtRange = (*ev).tracks[iTrkA].IsInsideReferencePtRange;
- 			bool TriggerIsInsideChParticlPtRange = (*ev).tracks[iTrkA].IsInsideChParticlPtRange;
- 			bool TriggerIsPID 						 = (*ev).tracks[iTrkA].IsPID;
-
-			double iw0 = (*ev).tracks[iTrkA].w0;
-			double iw  = (*ev).tracks[iTrkA].w;
+			double iw  = (*ev).phis[iPhi].w;
 
 			for (int jTrkB = 0; jTrkB < nTrkB; jTrkB++)
 			{
@@ -427,31 +429,60 @@ void CorrelationFramework::MixedCorrelation( EventData *ev, std::deque< EventDat
 				double dEtaB = dEta( ieta, jeta);
 				double dPhiB = dPhi( iphi, jphi);
 
-				double w0 = iw0 * jw0;
-				double w;
-				if ( TriggerIsPID )
-				{ w  = iw  * jw0;}
-
-				// charged particle reference
-				if ( TriggerIsInsideReferencePtRange )
-				{ correl2D_currev_cpar_ref_backgr->Fill(dEtaB, dPhiB, w0); }
-
-				// charged particle
-				if ( TriggerIsInsideChParticlPtRange )
-				{ correl2D_currev_backgr[ 0 ][ ptBin_CH ]->Fill(dEtaB, dPhiB, w0); }
-
-				if (maxtrkCorr2 < w) continue;
-
-				// PID particle
-				if ( TriggerIsPID )
-				{  correl2D_currev_backgr[ (*ev).tracks[iTrkA].pid ][ ptBin_ID ]->Fill(dEtaB, dPhiB, w);};
-
+				double w  = iw  * jw0;
+				
+				correl2D_currev_backgr[ (*ev).phis[iPhi].typ ][ ptBin ]->Fill(dEtaB, dPhiB, w);
 
 			}
 
 		}
 	}
 
+	// (Charged particle) - (Charged particle) reference
+	for (int iEvB = 0; iEvB < nMixEvs; iEvB++)
+	{ 
+
+		int EvB_ID = (*EventCache)[multBin][zvtxBin][iEvB].EventID;
+
+		if ( EvA_ID == EvB_ID  ) {std::cerr << "Warning! Trying to mix same events in making the background function" << std::endl;} 
+
+		nEvents_Processed_backgr_total->Fill(1.);
+
+		int nTrkB = (*EventCache)[multBin][zvtxBin][iEvB].tracks.size();
+
+		for (int iTrkA = 0; iTrkA < nTrkA; iTrkA++)
+		{
+
+
+			if ( !(*ev).tracks[iTrkA].IsInsideReferencePtRange ) continue;
+
+		   double ieta = (*ev).tracks[iTrkA].eta;
+		   double iphi = (*ev).tracks[iTrkA].phi;
+
+			double iw0 = (*ev).tracks[iTrkA].w0;
+
+			for (int jTrkB = 0; jTrkB < nTrkB; jTrkB++)
+			{
+				if ( !(*EventCache)[multBin][zvtxBin][iEvB].tracks[jTrkB].IsInsideReferencePtRange ) continue;
+
+			   double jeta = (*EventCache)[multBin][zvtxBin][iEvB].tracks[jTrkB].eta;
+			   double jphi = (*EventCache)[multBin][zvtxBin][iEvB].tracks[jTrkB].phi;
+				
+				double jw0 = (*EventCache)[multBin][zvtxBin][iEvB].tracks[jTrkB].w0;
+
+				double dEtaB = dEta( ieta, jeta);
+				double dPhiB = dPhi( iphi, jphi);
+
+				double w0  = iw0  * jw0;
+				
+				correl2D_currev_cpar_ref_backgr->Fill(dEtaB, dPhiB, w0);
+
+			}
+
+		}
+	}
+
+	ev->phis.clear();
 	(*EventCache)[ ev->GetMultiplicityBin_EvM() ][ ev->GetzVtxBin() ].pop_front();
 	(*EventCache)[ ev->GetMultiplicityBin_EvM() ][ ev->GetzVtxBin() ].push_back( (*ev) );
 
@@ -485,14 +516,9 @@ void CorrelationFramework::AddCurrentEventCorrelation( EventData* ev )
 //		std::cerr << Form("Entries of correl2D/ntrig: %f", double(correl2D_currev_signal[TypBin][ptBin]->GetEntries())/(*ev).nTriggerParticles[TypBin][ptBin]) << std::endl;
 
 		if( (*ev).nTriggerParticles[TypBin][ptBin] == 0.0 ) continue;
+
 	 	correl2D_signal[TypBin][ptBin][currev_multBin]->Add( correl2D_currev_signal[TypBin][ptBin], 1./(*ev).nTriggerParticles[TypBin][ptBin] );
 	 	correl2D_backgr[TypBin][ptBin][currev_multBin]->Add( correl2D_currev_backgr[TypBin][ptBin], 1./(*ev).nTriggerParticles[TypBin][ptBin] );
-
-		if ( DoSelfCorrelation )
-		{
-	 	correl2D_self_signal[TypBin][ptBin][currev_multBin]->Add( correl2D_self_currev_signal[TypBin][ptBin], 1./(*ev).nTriggerParticles[TypBin][ptBin] ); 
-	 	correl2D_self_backgr[TypBin][ptBin][currev_multBin]->Add( correl2D_self_currev_backgr[TypBin][ptBin], 1./(*ev).nTriggerParticles[TypBin][ptBin] );
-		}
 
 	}
 
@@ -509,45 +535,81 @@ void CorrelationFramework::AddCurrentEventCorrelation( EventData* ev )
 // - Calcvns()
 void CorrelationFramework::Calcvns()
 {
-	for( int TypBin=0; TypBin < nCorrTyp; TypBin++)
-	for( int ptBin=0; ptBin < nPtBins[TypBin]; ptBin++)
+	for( int ptBin=0; ptBin < nPtBins[0]; ptBin++)
 	for( int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
 	{
 
-		double V2        = correl1D_FitResults[TypBin][ptBin][multBin].V2;
+		double V2_low    = correl1D_FitResults[0][ptBin][multBin].V2;
+		double V2_can    = correl1D_FitResults[1][ptBin][multBin].V2;
+		double V2_hig    = correl1D_FitResults[2][ptBin][multBin].V2;
+
+		double V2_low_Err    = correl1D_FitResults[0][ptBin][multBin].V2_Error;
+		double V2_can_Err    = correl1D_FitResults[1][ptBin][multBin].V2_Error;
+		double V2_hig_Err    = correl1D_FitResults[2][ptBin][multBin].V2_Error;
+
+		double V2_avg     = (V2_low + V2_hig)/2;
+		double V2_avg_Err = sqrt(V2_low_Err*V2_low_Err + V2_hig_Err*V2_hig_Err)/2;
+
 		double V2_cp     = correl1D_FitResults_cpar_ref[multBin].V2;
-		double V2_Err    = correl1D_FitResults[TypBin][ptBin][multBin].V2_Error;
 		double V2_cp_Err = correl1D_FitResults_cpar_ref[multBin].V2_Error;
 
-		double V3        = correl1D_FitResults[TypBin][ptBin][multBin].V3;
-		double V3_cp     = correl1D_FitResults_cpar_ref[multBin].V3;
-		double V3_Err    = correl1D_FitResults[TypBin][ptBin][multBin].V3_Error;
-		double V3_cp_Err = correl1D_FitResults_cpar_ref[multBin].V3_Error;
+		double V3_low    = correl1D_FitResults[0][ptBin][multBin].V3;
+		double V3_can    = correl1D_FitResults[1][ptBin][multBin].V3;
+		double V3_hig    = correl1D_FitResults[2][ptBin][multBin].V3;
 
-		double v2 = V2 / sqrt( V2_cp);
-		double v3 = V3 / sqrt( V3_cp);
+		double V3_low_Err    = correl1D_FitResults[0][ptBin][multBin].V3_Error;
+		double V3_can_Err    = correl1D_FitResults[1][ptBin][multBin].V3_Error;
+		double V3_hig_Err    = correl1D_FitResults[2][ptBin][multBin].V3_Error;
 
-		correl_Results[TypBin][ptBin][multBin].v2           = v2;
-		correl_Results[TypBin][ptBin][multBin].v2_StatError = sqrt( (V2_Err*V2_Err/ V2_cp) + (0.25 * V2 * V2 * V2_cp_Err * V2_cp_Err / pow( V2_cp, 3)) );
-		correl_Results[TypBin][ptBin][multBin].v2_SystError = v2 * SystErrors[TypBin];
+		// WARNING warning Warning
+		double s2b    = spectruminf[ptBin][multBin].sigtobkgrViaFit;
+		double c2a0   = (1. + 1./s2b);
+		double da02a0 = spectruminf[ptBin][multBin].signalViaFitEntries_error/spectruminf[ptBin][multBin].signalViaFitEntries;
 
-		correl_Results[TypBin][ptBin][multBin].v3           = V3 / sqrt( V3_cp);
-		correl_Results[TypBin][ptBin][multBin].v3_StatError = sqrt( (V3_Err*V3_Err/ V3_cp) + (0.25 * V3 * V3 * V3_cp_Err * V3_cp_Err / pow( V3_cp, 3)) );
-		correl_Results[TypBin][ptBin][multBin].v3_SystError = v3 * SystErrors[TypBin];
+		double V2_phi_low = V2_can * (1. + 1./s2b) - V2_low/s2b;
+		double V2_phi_avg = V2_can * (1. + 1./s2b) - V2_avg/s2b;
+		double V2_phi_hig = V2_can * (1. + 1./s2b) - V2_hig/s2b;
+
+		// uncertainty coming from s2b estimation not added
+//		double V2_phi_low_StatError = sqrt( (1. + 1./s2b) * (1. + 1./s2b) * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_low_Err * V2_low_Err );
+//		double V2_phi_avg_StatError = sqrt( (1. + 1./s2b) * (1. + 1./s2b) * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_avg_Err * V2_avg_Err );
+//		double V2_phi_hig_StatError = sqrt( (1. + 1./s2b) * (1. + 1./s2b) * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_hig_Err * V2_hig_Err );
+
+		// Full uncertainty
+		double V2_phi_low_StatError = sqrt( c2a0 * c2a0 * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_low_Err * V2_low_Err + (V2_can-V2_phi_low)*(V2_can-V2_phi_low)*c2a0*c2a0*da02a0*da02a0 );
+		double V2_phi_avg_StatError = sqrt( c2a0 * c2a0 * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_avg_Err * V2_avg_Err + (V2_can-V2_phi_avg)*(V2_can-V2_phi_avg)*c2a0*c2a0*da02a0*da02a0 );
+		double V2_phi_hig_StatError = sqrt( c2a0 * c2a0 * V2_can_Err * V2_can_Err + (1./s2b/s2b) * V2_hig_Err * V2_hig_Err + (V2_can-V2_phi_hig)*(V2_can-V2_phi_hig)*c2a0*c2a0*da02a0*da02a0 );
+
+		double v2_phi_low = V2_phi_low / sqrt( V2_cp );
+		double v2_phi_avg = V2_phi_avg / sqrt( V2_cp );
+		double v2_phi_hig = V2_phi_hig / sqrt( V2_cp );
+
+		double v2_win_low = V2_low / sqrt( V2_cp );
+		double v2_win_can = V2_can / sqrt( V2_cp );
+		double v2_win_hig = V2_hig / sqrt( V2_cp );
+
+		correl_Results[0][ptBin][multBin].v2           = v2_phi_low; 
+		correl_Results[1][ptBin][multBin].v2           = v2_phi_avg; 
+		correl_Results[2][ptBin][multBin].v2           = v2_phi_hig; 
+
+		correl_Results[0][ptBin][multBin].v2_StatError = v2_phi_low * sqrt( ( (V2_phi_low_StatError*V2_phi_low_StatError)/(V2_phi_low*V2_phi_low) ) + ( (V2_cp_Err*V2_cp_Err)/(V2_cp*V2_cp) ) ); 
+		correl_Results[1][ptBin][multBin].v2_StatError = v2_phi_avg * sqrt( ( (V2_phi_avg_StatError*V2_phi_avg_StatError)/(V2_phi_avg*V2_phi_avg) ) + ( (V2_cp_Err*V2_cp_Err)/(V2_cp*V2_cp) ) ); 
+		correl_Results[2][ptBin][multBin].v2_StatError = v2_phi_hig * sqrt( ( (V2_phi_hig_StatError*V2_phi_hig_StatError)/(V2_phi_hig*V2_phi_hig) ) + ( (V2_cp_Err*V2_cp_Err)/(V2_cp*V2_cp) ) ); 
+
+		correl_Results[0][ptBin][multBin].v2_SystError = 0;
+		correl_Results[1][ptBin][multBin].v2_SystError = 0;
+		correl_Results[2][ptBin][multBin].v2_SystError = 0;
 
 
+		correl_Results_unsubtracted[0][ptBin][multBin].v2 = v2_win_low; 
+		correl_Results_unsubtracted[1][ptBin][multBin].v2 = v2_win_can; 
+		correl_Results_unsubtracted[2][ptBin][multBin].v2 = v2_win_hig;
 
-		if ( DoSelfCorrelation )
-		{
-		double V2_self     = correl1D_FitResults_self[TypBin][ptBin][multBin].V2;
-		double V2_self_Err = correl1D_FitResults[TypBin][ptBin][multBin].V2_Error;
-
-		correl_Results_self[TypBin][ptBin][multBin].v2           = sqrt(V2_self);
-		correl_Results_self[TypBin][ptBin][multBin].v2_StatError = 0.5 * V2_self_Err / sqrt(V2_self);
-		}
+		correl_Results_unsubtracted[0][ptBin][multBin].v2_StatError = sqrt( (V2_low_Err*V2_low_Err/ V2_cp) + (0.25 * V2_low * V2_low * V2_cp_Err * V2_cp_Err / pow( V2_cp, 3)) );
+		correl_Results_unsubtracted[1][ptBin][multBin].v2_StatError = sqrt( (V2_can_Err*V2_can_Err/ V2_cp) + (0.25 * V2_can * V2_can * V2_cp_Err * V2_cp_Err / pow( V2_cp, 3)) );
+		correl_Results_unsubtracted[2][ptBin][multBin].v2_StatError = sqrt( (V2_hig_Err*V2_hig_Err/ V2_cp) + (0.25 * V2_hig * V2_hig * V2_cp_Err * V2_cp_Err / pow( V2_cp, 3)) );
 
 	}
-
 
 	for( int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
 	{
@@ -555,8 +617,8 @@ void CorrelationFramework::Calcvns()
 		correl_Results_cpar_ref[multBin].v2_StatError = 0.5 * correl1D_FitResults_cpar_ref[multBin].V2_Error / sqrt( correl1D_FitResults_cpar_ref[multBin].V2);
 		correl_Results_cpar_ref[multBin].v2_SystError = 0;
 	}
-}
 
+}
 
 //////////////////////////
 // - ResetCurrentEvent()
@@ -568,11 +630,6 @@ void CorrelationFramework::ResetCurrentEventCorrelation()
 		correl2D_currev_signal[TypBin][ptBin]->Reset();
 		correl2D_currev_backgr[TypBin][ptBin]->Reset();
 
-		if ( DoSelfCorrelation )
-		{
-			correl2D_self_currev_signal[TypBin][ptBin]->Reset();
-			correl2D_self_currev_backgr[TypBin][ptBin]->Reset();
-		}
 	}
 
 	correl2D_currev_cpar_ref_signal->Reset();
@@ -595,12 +652,6 @@ void CorrelationFramework::doAnalysis()
 
 	  correl1D_FitResults      [TypBin][ptBin][multBin] = resdata;
 
-	  if ( DoSelfCorrelation )
-	 {
-	  Correl1DfitResultsData resdata_self;
-	  resdata_self = doAnalysisSteps( correl2D_self_signal[TypBin][ptBin][multBin], correl2D_self_backgr[TypBin][ptBin][multBin], correl2D_self_functi[TypBin][ptBin][multBin], correl1D_self[TypBin][ptBin][multBin], nEvents_Processed_signal[TypBin][ptBin][multBin], nEvents_Processed_backgr[TypBin][ptBin][multBin], dEtacut);
-	  correl1D_FitResults_self [TypBin][ptBin][multBin] = resdata_self;
-	 }
 	
 	}
 
@@ -663,6 +714,18 @@ std::vector< double > CorrelationFramework::GetV2vec ( int TypBin, int multBin)
 	return V2vec;
 }
 
+//////////////////////////
+// Getv2_StatErrorvec
+std::vector< double > CorrelationFramework::Getv2_StatErrorvec( CorrelResults ***results, int TypBin, int multBin)
+{
+	std::vector< double > v2_StatErrorvec(nPtBins[TypBin]);
+	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	{
+		v2_StatErrorvec[ptBin] = results[TypBin][ptBin][multBin].v2_StatError;
+	}
+	return v2_StatErrorvec;
+}
+
 /////////////////////
 // - GetV2_Errorvec
 std::vector< double > CorrelationFramework::GetV2_Errorvec( int TypBin, int multBin)
@@ -677,14 +740,29 @@ std::vector< double > CorrelationFramework::GetV2_Errorvec( int TypBin, int mult
 
 ///////////////////////
 // - Getv2vec
-std::vector< double > CorrelationFramework::Getv2vec ( int TypBin, int multBin)
+std::vector< double > CorrelationFramework::Getv2vec ( int TypBin, int multBin )
+{
+
+	std::vector< double > v2vec(nPtBins[0]);
+
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
+	{
+		v2vec[ptBin] = correl_Results[TypBin][ptBin][multBin].v2;
+	}
+
+	return v2vec;
+}
+
+///////////////////////////
+//
+std::vector< double > CorrelationFramework::Getv2vec ( CorrelResults ***results, int TypBin, int multBin)
 {
 
 	std::vector< double > v2vec(nPtBins[TypBin]);
 
 	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
 	{
-		v2vec[ptBin] = correl_Results[TypBin][ptBin][multBin].v2;
+		v2vec[ptBin] = results[TypBin][ptBin][multBin].v2;
 	}
 
 	return v2vec;
@@ -695,46 +773,15 @@ std::vector< double > CorrelationFramework::Getv2vec ( int TypBin, int multBin)
 std::vector< double > CorrelationFramework::Getv3vec ( int TypBin, int multBin)
 {
 
-	std::vector< double > v3vec(nPtBins[TypBin]);
+	std::vector< double > v3vec(nPtBins[0]);
 
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
 	{
 		v3vec[ptBin] = correl_Results[TypBin][ptBin][multBin].v3;
 	}
 
 	return v3vec;
 }
-
-///////////////////////
-// - Get_self_v2vec
-std::vector< double > CorrelationFramework::Get_self_v2vec ( int TypBin, int multBin)
-{
-
-	std::vector< double > v2vec(nPtBins[TypBin]);
-
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
-	{
-		v2vec[ptBin] = correl_Results_self[TypBin][ptBin][multBin].v2;
-	}
-
-	return v2vec;
-}
-
-///////////////////////
-// - Get_self_v2_StatErrorvec
-std::vector< double > CorrelationFramework::Get_self_v2_StatErrorvec ( int TypBin, int multBin)
-{
-
-	std::vector< double > v2Errorvec(nPtBins[TypBin]);
-
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
-	{
-		v2Errorvec[ptBin] = correl_Results_self[TypBin][ptBin][multBin].v2_StatError;
-	}
-
-	return v2Errorvec;
-}
-
 
 /////////////////////////////
 // - Get_cpar_ref_v2vec_nTrk
@@ -758,10 +805,10 @@ std::vector< double > CorrelationFramework::Get_cpar_ref_v2_StatError_vec_nTrk (
 
 //////////////////////////
 // Getv2_StatErrorvec
-std::vector< double > CorrelationFramework::Getv2_StatErrorvec( int TypBin, int multBin)
+std::vector< double > CorrelationFramework::Getv2_StatErrorvec( int TypBin, int multBin )
 {
-	std::vector< double > v2_StatErrorvec(nPtBins[TypBin]);
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	std::vector< double > v2_StatErrorvec(nPtBins[0]);
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
 	{
 		v2_StatErrorvec[ptBin] = correl_Results[TypBin][ptBin][multBin].v2_StatError;
 	}
@@ -772,8 +819,8 @@ std::vector< double > CorrelationFramework::Getv2_StatErrorvec( int TypBin, int 
 // Getv2_SystErrorvec
 std::vector< double > CorrelationFramework::Getv2_SystErrorvec( int TypBin, int multBin)
 {
-	std::vector< double > v2_SystErrorvec(nPtBins[TypBin]);
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	std::vector< double > v2_SystErrorvec(nPtBins[0]);
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
 	{
 		v2_SystErrorvec[ptBin] = correl_Results[TypBin][ptBin][multBin].v2_SystError;
 	}
@@ -784,8 +831,8 @@ std::vector< double > CorrelationFramework::Getv2_SystErrorvec( int TypBin, int 
 // Getv3_StatErrorvec
 std::vector< double > CorrelationFramework::Getv3_StatErrorvec( int TypBin, int multBin)
 {
-	std::vector< double > v3_StatErrorvec(nPtBins[TypBin]);
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	std::vector< double > v3_StatErrorvec(nPtBins[0]);
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
 	{
 		v3_StatErrorvec[ptBin] = correl_Results[TypBin][ptBin][multBin].v3_StatError;
 	}
@@ -796,8 +843,8 @@ std::vector< double > CorrelationFramework::Getv3_StatErrorvec( int TypBin, int 
 // Getv3_SystErrorvec
 std::vector< double > CorrelationFramework::Getv3_SystErrorvec( int TypBin, int multBin)
 {
-	std::vector< double > v3_SystErrorvec(nPtBins[TypBin]);
-	for (int ptBin = 0; ptBin < nPtBins[TypBin]; ptBin++)
+	std::vector< double > v3_SystErrorvec(nPtBins[0]);
+	for (int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
 	{
 		v3_SystErrorvec[ptBin] = correl_Results[TypBin][ptBin][multBin].v3_SystError;
 	}
@@ -847,7 +894,8 @@ void CorrelationFramework::display_v2s()
 	double v2       	     = correl_Results[TypBin][ptBin][multBin].v2;
 	double v2_StatError    = correl_Results[TypBin][ptBin][multBin].v2_StatError;
 
-	std::cout << Form("TypBin: %1d pt: [ %.2f - %.2f ] mult: [ %03d - %03d ]  v2: %.4f +/- %.4f |", TypBin, pt1, pt2, mult1, mult2, v2, v2_StatError  ) << std::endl; 
+	std::cerr << Form("TypBin: %1d pt: [ %.2f - %.2f ] mult: [ %03d - %03d ]  V2: %.4f +/- %.4f |", TypBin, pt1, pt2, mult1, mult2, V2, V2_Error  ) << std::endl; 
+	std::cerr << Form("TypBin: %1d pt: [ %.2f - %.2f ] mult: [ %03d - %03d ]  v2: %.4f +/- %.4f |", TypBin, pt1, pt2, mult1, mult2, v2, v2_StatError  ) << std::endl; 
  }
  
 
@@ -861,7 +909,7 @@ void CorrelationFramework::display_v2s()
 	double v2       	     = correl_Results_cpar_ref[multBin].v2;
 	double v2_StatError    = correl_Results_cpar_ref[multBin].v2_StatError;
 
-	std::cout << Form(" mult: [ %03d - %03d ] v2_cpar: %.4f +/- %.4f", mult1, mult2, v2, v2_StatError ) << std::endl;
+	std::cerr << Form(" mult: [ %03d - %03d ] v2_cpar: %.4f +/- %.4f", mult1, mult2, v2, v2_StatError ) << std::endl;
  }
 
 }
@@ -1333,20 +1381,7 @@ void Setup_TH1Ds_nMult( TH1D **&correl1D, int nMultiplicityBins, const char hist
 }
 
 
-// Setup_CorrelResults_nCorrnPtnMult
-void Setup_CorrelResults_nCorrnPtnMult( CorrelResults ***&correl_Results, int nCorrTyp, int *nPtBins, int nMultiplicityBins )
-{
 
-	correl_Results	= new CorrelResults  **[nCorrTyp];
-
-	for(int TypBin=0; TypBin < nCorrTyp; TypBin++)
-	{
-		correl_Results     [TypBin] = new CorrelResults         *[nPtBins[TypBin]];
-
-		for(int ptBin=0; ptBin < nPtBins[TypBin]; ptBin++)
-		{ correl_Results     [TypBin][ptBin] = new CorrelResults [nMultiplicityBins]; }
-	}
-}
 
 
 // Setup_Correl1DfitResultsData_nCorrnPtnMult
@@ -1443,6 +1478,22 @@ void CorrelationFramework::Read_TH1Ds_CorrPtMult( TH1D ****&histo, const char hi
 
 }
 
+void CorrelationFramework::Read_TH1Ds_PtMult( TH1D ***&histo, const char histoname[] )
+{
+
+	Allocate_TH1Ds_PtMult( histo );
+
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{
+		histo[ptBin][multBin] = (TH1D*)f_preproc->Get(
+		genStrPtMult( histoname, ptBin, multBin ).c_str()
+		);
+		if ( histo[ptBin][multBin] == NULL ) {std::cerr << Form("%s read failed. No %s found.\n",genStrPtMult( histoname, ptBin, multBin ).c_str(), genStrPtMult( histoname, ptBin, multBin ).c_str()); exit(-1);}
+	}
+
+}
+
 void CorrelationFramework::Read_TH2Ds_CorrPtMult( TH2D ****&histo, const char histoname[] )
 {
 	Allocate_TH2Ds_CorrPtMult( histo );
@@ -1516,6 +1567,23 @@ void CorrelationFramework::Setup_TH2Ds_CorrPtMult( TH2D ****&histo, const char h
 
 }
 
+void CorrelationFramework::Setup_TH1Ds_PtMult( TH1D ***&histo, const char histoname[], const char titlelabels[], int XnBins, double Xmin, double Xmax )
+{
+
+	Allocate_TH1Ds_PtMult( histo );
+
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{
+		histo[ptBin][multBin] = new TH1D(
+		genStrPtMult( histoname, ptBin, multBin ).c_str(),
+		titlelabels,
+		XnBins, Xmin, Xmax
+   	);
+	}
+
+}
+
 void CorrelationFramework::Setup_TH2Ds_Mult( TH2D **&histo, const char histoname[], const char titlelabels[], int XnBins, double Xmin, double Xmax, int YnBins, double Ymin, double Ymax )
 {
 
@@ -1531,6 +1599,43 @@ void CorrelationFramework::Setup_TH2Ds_Mult( TH2D **&histo, const char histoname
    	);
 	}
 
+}
+
+void CorrelationFramework::Setup_spectruminfo_PtMult( )
+{
+	spectruminf = new spectruminfo*[nPtBins[0]];	
+
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	{
+		spectruminf[ptBin] = new spectruminfo[nMultiplicityBins_Ana];	
+	}
+}
+
+// Setup_CorrelResults_nPtnMult
+//void CorrelationFramework::Setup_CorrelResults_PtMult( )
+//{
+//	correl_Results = new CorrelResults         *[nPtBins[0]];
+//
+//	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+//	{ correl_Results[ptBin] = new CorrelResults[nMultiplicityBins_Ana]; }
+//}
+
+void CorrelationFramework::Setup_CorrelResults_CorrPtMult(  )
+{
+	correl_Results 			 = new CorrelResults**[nCorrTyp];
+	correl_Results_unsubtracted = new CorrelResults**[nCorrTyp];
+
+	for(int TypBin=0; TypBin < nCorrTyp; TypBin++)
+	{
+		correl_Results[TypBin] 				= new CorrelResults*[nPtBins[0]];
+		correl_Results_unsubtracted[TypBin] = new CorrelResults*[nPtBins[0]];
+
+		for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+		{ 
+			correl_Results[TypBin][ptBin] 			 = new CorrelResults[nMultiplicityBins_Ana]; 
+			correl_Results_unsubtracted[TypBin][ptBin] = new CorrelResults[nMultiplicityBins_Ana]; 
+		}
+	}
 }
 
 
@@ -1557,6 +1662,19 @@ void CorrelationFramework::Allocate_TH1Ds_CorrPtMult( TH1D ****&histo )
 	for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
 	{ histo[TypBin][ptBin][multBin] = NULL; }
 
+}
+
+void CorrelationFramework::Allocate_TH1Ds_PtMult( TH1D ***&histo )
+{
+
+	histo = new TH1D**[nPtBins[0]];
+
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	{ histo[ptBin] = new TH1D*[nMultiplicityBins_Ana]; }
+
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{ histo[ptBin][multBin] = NULL; }
 }
 
 void CorrelationFramework::Allocate_TH2Ds_CorrPtMult( TH2D ****&histo )
@@ -1601,6 +1719,17 @@ std::string CorrelationFramework::genStrCorrPtMult (const char name[], int TypBi
 	return out;
 }
 
+std::string CorrelationFramework::genStrPtMult (const char name[], int ptBin, int multBin)
+{
+	double pt1 = pt(0, ptBin, 0);
+	double pt2 = pt(0, ptBin, 1);
+	int mult1 = multiplicity_Ana (multBin, 0, nMultiplicityBins_Ana);
+	int mult2 = multiplicity_Ana (multBin, 1, nMultiplicityBins_Ana);
+
+	std::string out = Form("%s_pt_%.2f-%.2f_nTrk_%03d-%03d", name, pt1, pt2, mult1, mult2);
+	return out;
+}
+
 std::string CorrelationFramework::genStrMult (const char name[], int multBin)
 {
 	int mult1 = multiplicity_Ana (multBin, 0, nMultiplicityBins_Ana);
@@ -1608,4 +1737,21 @@ std::string CorrelationFramework::genStrMult (const char name[], int multBin)
 
 	std::string out = Form("%s_nTrk_%03d-%03d", name, mult1, mult2);
 	return out;
+}
+
+
+void CorrelationFramework::fitSpectra()
+{
+	for(int ptBin=0; ptBin < nPtBins[0]; ptBin++)
+	for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{
+		std::string dir = Form("./results/%s/spectrum/", tag.c_str() );
+		std::string filebasename = genStrPtMult("spectrum", ptBin, multBin);
+		std::string figurebasename = dir+filebasename;
+		std::string fitlog = Form("./results/%s/fit/fitlog", tag.c_str() );
+		std::cout << spectruminf[ptBin][multBin].mass << std::endl;
+
+		fitSpectrum (spectrum[ptBin][multBin], spectruminf[ptBin][multBin], figurebasename, fitlog, dataset_name, false);
+		fitSpectrum (spectrum[ptBin][multBin], spectruminf[ptBin][multBin], figurebasename, fitlog, dataset_name, true);
+	}
 }

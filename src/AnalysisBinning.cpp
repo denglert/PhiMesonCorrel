@@ -13,98 +13,36 @@
 // 3 - 	prot   - chadron
 // 4 - non-prot - chadron
 
-const int nCorrTyp_ = 5;
+const int nCorrTyp_ = 3;
 
 ////////////////////////
 // *** Pt binning *** //
 ////////////////////////
 
 const int nPtBinsMax_      	=   16; 
-const int nPtBins_[nCorrTyp_] = { 14, 8, 7, 14, 6 };
+const int nPtBins_[nCorrTyp_] = { 6, 6, 6 };
 ////const int nPtBins_[nCorrTyp_] = { 6, 3, 4, 6 };
-//
+
 const float trigptbins[nCorrTyp_][nPtBinsMax_][2] = 
 {
-	 {{  0.20,  0.30 },
-	  {  0.30,  0.40 },
-	  {  0.40,  0.50 },
-	  {  0.50,  0.60 },
-	  {  0.60,  0.70 },
-	  {  0.70,  0.80 },
-	  {  0.80,  0.90 },
-	  {  0.90,  1.00 },
-	  {  1.00,  1.10 },
-	  {  1.10,  1.20 },
-	  {  1.20,  1.30 },
-	  {  1.30,  1.40 },
-	  {  1.40,  1.50 },
-	  {  1.50,  1.60 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 }},
-	 {{  0.20,  0.30 },
-	  {  0.30,  0.40 },
-	  {  0.40,  0.50 },
-	  {  0.50,  0.60 },
-	  {  0.60,  0.70 },
-	  {  0.70,  0.80 },
-	  {  0.80,  0.90 },
-	  {  0.90,  1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 }},
-	 {{  0.20,  0.30 },
-	  {  0.30,  0.40 },
-	  {  0.40,  0.50 },
-	  {  0.50,  0.60 },
-	  {  0.60,  0.70 },
-	  {  0.70,  0.80 },
-	  {  0.80,  0.90 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 }},
-	 {{  0.20,  0.30 },
-	  {  0.30,  0.40 },
-	  {  0.40,  0.50 },
-	  {  0.50,  0.60 },
-	  {  0.60,  0.70 },
-	  {  0.70,  0.80 },
-	  {  0.80,  0.90 },
-	  {  0.90,  1.00 },
-	  {  1.00,  1.10 },
-	  {  1.10,  1.20 },
-	  {  1.20,  1.30 },
-	  {  1.30,  1.40 },
-	  {  1.40,  1.50 },
-	  {  1.50,  1.60 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 }},
-	 {{  1.00,  1.10 },
-	  {  1.10,  1.20 },
-	  {  1.20,  1.30 },
-	  {  1.30,  1.40 },
-	  {  1.40,  1.50 },
-	  {  1.50,  1.60 },
-	  { -1.00,  0.90 },
-	  { -1.00,  1.00 },
-	  { -1.00,  1.10 },
-	  { -1.00,  1.20 },
-	  { -1.00,  1.30 },
-	  { -1.00,  1.40 },
-	  { -1.00,  1.50 },
-	  { -1.00,  1.60 },
-	  { -1.00, -1.00 },
-	  { -1.00, -1.00 }}
+	 {{  0.30,  0.50 },
+	  {  0.50,  0.70 },
+	  {  0.70,  0.90 },
+	  {  0.90,  1.10 },
+	  {  1.10,  1.30 },
+	  {  1.30,  1.50 }},
+	 {{  0.30,  0.50 },
+	  {  0.50,  0.70 },
+	  {  0.70,  0.90 },
+	  {  0.90,  1.10 },
+	  {  1.10,  1.30 },
+	  {  1.30,  1.50 }},
+	 {{  0.30,  0.50 },
+	  {  0.50,  0.70 },
+	  {  0.70,  0.90 },
+	  {  0.90,  1.10 },
+	  {  1.10,  1.30 },
+	  {  1.30,  1.50 }}
 };
 
 
@@ -200,14 +138,37 @@ const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] =
 	  {   0,  120 }
 };
 
-// HIGH-MULTIPLICITY
-//const int nMultiplicityBins_Ana_HDR = 4;
+
+// Single HighMult Bin
+//const int nMultiplicityBins_Ana_HDR = 1;
 //const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
 //{
-//	  { 120, 150 },
-//	  { 150, 185 },
-//	  { 185, 220 },
-//	  { 220, 260 },
+//	  {  120,  260 }
+//};
+
+
+//  HighMult Bin
+//const int nMultiplicityBins_Ana_HDR = 1;
+//const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
+//{
+//	  {  120,  260 }
+//};
+
+
+// New MinBias
+//const int nMultiplicityBins_Ana_HDR = 2;
+//const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
+//{
+//	  {   0,  60 },
+//	  {  60, 120 }
+//};
+
+// HIGH-MULTIPLICITY
+//const int nMultiplicityBins_Ana_HDR = 2;
+//const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
+//{
+//	  { 120, 180 },
+//	  { 180, 260 },
 ////	  { 260, 300 }
 //////////	  { 300, 350 }
 //};
@@ -264,7 +225,7 @@ const float zvtxbins[nZvtxBins_][2] =
 	  {   1.0,   2.0 },
 	  {   2.0,   3.0 },
 	  {   3.0,   4.0 },
-  	  {   4.0,   5.0 },
+	  {   4.0,   5.0 },
 	  {   5.0,   6.0 },
 	  {   6.0,   7.0 },
 	  {   7.0,   8.0 },
@@ -272,6 +233,18 @@ const float zvtxbins[nZvtxBins_][2] =
 	  {   9.0,  11.0 },
 	  {  11.0,  13.0 },
 //	  {  13.0,  15.0 },
+};
+
+//////////////////////////
+// *** Mass binning *** //
+//////////////////////////
+const int nMassBins_ = 3;
+
+const double massbins[nMassBins_][2] = 
+{
+	  {  0.994, 1.004 },
+	  {  1.014, 1.024 },
+	  {  1.039, 1.049 },
 };
 
 //////////////////////////
@@ -300,11 +273,16 @@ const double dPhi_binWidth = (dPhiMax-dPhiMin)/ndPhiBins;
 // //const int posdEtaCut2Bin_ = 78;
 // const int posdEtaCut2Bin_ = 64;
 
-// CMS bins
-const int negdEtaCut1Bin_ = 9;
+// CMS default bins [-4.0 -2.0] & [2.0 - 4.0]
+//const int negdEtaCut1Bin_ = 9;
+//const int negdEtaCut2Bin_ = 28;
+//const int posdEtaCut1Bin_ = 69;
+//const int posdEtaCut2Bin_ = 88;
+
+const int negdEtaCut1Bin_ = 12;
 const int negdEtaCut2Bin_ = 28;
 const int posdEtaCut1Bin_ = 69;
-const int posdEtaCut2Bin_ = 88;
+const int posdEtaCut2Bin_ = 85;
 
 // Constrained bins
 //const int negdEtaCut1Bin_ = 19;
@@ -428,6 +406,16 @@ int zvtxbin(double zvtx, int bins = 1)
 	return zvtxbin;
 }
 
+short int massbin(double mass)
+{
+	for(int massBin = 0; massBin < nMassBins_; massBin++)
+	{
+   	if ( (massbins[massBin][0] <= mass) && (mass <= massbins[massBin][1] ) ) { return massBin; };
+	}
+
+	return -1;
+}
+
 std::string particletype (int ID)
 {
 
@@ -435,11 +423,9 @@ std::string particletype (int ID)
 
 	switch (ID)
    { 
-		case 0: out = "charged"; return out;
-		case 1: out = "#pi"; return out;
-		case 2: out = "K"; return out;
-		case 3: out = "p"; return out;
-		case 4: out = "non-p"; return out;
+		case 0: out = "#Phi_{low}"; return out;
+		case 1: out = "#Phi_{cand}"; return out;
+		case 2: out = "#Phi_{high}"; return out;
    }
 }
 
@@ -450,9 +436,8 @@ std::string particletypelabel (int ID)
 
 	switch (ID)
    { 
-		case 0: out = "cpar"; return out;
-		case 1: out = "pion"; return out;
-		case 2: out = "kaon"; return out;
-		case 3: out = "prot"; return out;
+		case 1: out = "philow"; return out;
+		case 2: out = "phican"; return out;
+		case 3: out = "phihig"; return out;
    }
 }

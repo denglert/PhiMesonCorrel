@@ -109,17 +109,10 @@ int PIDUtil::GetID(const Tracks_c &tTracks, int iTrk)
 {
 	float eta  = tTracks.trkEta[iTrk];
   	float p    = tTracks.trkPt[iTrk] * cosh(tTracks.trkEta[iTrk]);
-	float pt   = tTracks.trkPt[iTrk];
 	float dEdx = tTracks.dedx[iTrk];
 
-	if (  etaMax < fabs(eta) ) 							{return unIDcode;}
-	if (  isPion(p, dEdx) == true ) 						{return 1;}
 	if (  isKaon(p, dEdx) == true ) 						{return 2;}
 
-	bool izProt = isProt(p, dEdx);
-
-	if (   izProt ) 											{return 3;}
-	if (  (izProt == false) && (p < BB_NonProt_maxpcut) && ( BB_NonProt_mindEdxcut < dEdx) ) {return 4;}
 	return unIDcode;
 }
 
@@ -128,19 +121,21 @@ int PIDUtil::GetID(const Tracks &tTracks, int iTrk)
 
 	float eta  = tTracks.trkEta[iTrk];
   	float p    = tTracks.trkPt[iTrk] * cosh(tTracks.trkEta[iTrk]);
-	float pt   = tTracks.trkPt[iTrk];
 	float dEdx = tTracks.dedx[iTrk];
 
-	if (  etaMax < fabs(eta) ) 							{return unIDcode;}
-	if (  isPion(p, dEdx) == true ) 						{return 1;}
 	if (  isKaon(p, dEdx) == true ) 						{return 2;}
 
-	bool izProt = isProt(p, dEdx);
-
-	if (   izProt ) 											{return 3;}
-	if (  (izProt == false) && (p < BB_NonProt_maxpcut) && ( BB_NonProt_mindEdxcut < dEdx) ) {return 4;}
-
 	return unIDcode;
+}
+
+bool PIDUtil::IsKaon(const Tracks &tTracks, int iTrk)
+{
+  	float p    = tTracks.trkPt[iTrk] * cosh(tTracks.trkEta[iTrk]);
+	float dEdx = tTracks.dedx[iTrk];
+
+	if (  isKaon(p, dEdx) == true ) { return true;}
+
+	return false;
 }
 
 int PIDUtil::GetIDmTrk_trkCorr(const Tracks_c &tTracks, int iTrk)

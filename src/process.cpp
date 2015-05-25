@@ -16,12 +16,13 @@ int main( int argc, const char *argv[] )
 { 
 
 
- if(argc != 4)
+ if(argc != 5)
  { std::cerr << "Usage: process <.root file to be processed> <tag> <cont matrix>" << std::endl; }
 
  std::string inpFilename 		   = argv[1];
  std::string tag		            = argv[2];
  std::string contmatrix_filename = argv[3];
+ std::string dataset_name 			= argv[4];
 
  // Binning
  int nCorrTyp 	    = nCorrTyp_;
@@ -56,6 +57,7 @@ int main( int argc, const char *argv[] )
  CFW.preprocessed_filename = inpFilename;
  CFW.DoSelfCorrelation = false;
  CFW.SetupForProcess();
+ CFW.dataset_name = dataset_name;
  // Old Read-In, now integrated with CFW.SetupForProcess();
  // CFW.ReadIn_CorrelationFuncs( f );
  CFW.DeContaminate();
@@ -80,23 +82,22 @@ int main( int argc, const char *argv[] )
 // plot2DCorrelation_custom( CFW.correl2D_signal[1][1][0], signal,  signal_title);
 // plot2DCorrelation_custom( CFW.correl2D_functi[1][1][0], functi,  functi_title);
 // plot2DCorrelation_custom( CFW.correl2D_backgr[1][1][0], backgr,  backgr_title);
+//
+
+ CFW.fitSpectra();
 
  CFW.Calcvns();
- CFW.display_v2s();
-
+ CFW.SetupTGraphs();
 
  // Make figures
  for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
  {
-	CFW.makeFigv2vspT_allparticles(multBin, tag);
-	CFW.makeFigv2vspT_allparticles_ALICE_comparison(multBin, tag);
-	CFW.makeFigv3vspT_allparticles(multBin, tag);
-//	CFW.makeFigv2vspT_allparticles_with_selfcorrelation(multBin, tag);
-
+ 	CFW.makeFigPhiv2vspT_lowavghig( multBin );
+ 	CFW.makeFigPhiv2vspT_control( multBin );
  }
 
- CFW.makeFigv2vspT_HIN13002(tag);
- CFW.makeFigv2vsnTrk_cpar_ref(tag);
+
+ CFW.display_v2s();
 
  CFW.makeFigCorrel2D( tag );
  CFW.ReBin();
@@ -106,9 +107,32 @@ int main( int argc, const char *argv[] )
 ////////////////////////////////
  // ***** Setting output ***** //
  ////////////////////////////////
+ CFW.RemovePoint(0);
 
- CFW.Corr_Results->Close();
+ CFW.Save();
 
+ // Combined results
+ std::string pkp_res = "/afs/cern.ch/work/d/denglert/public/projects/PKPCorrelation_SLC6/CMSSW_5_3_20/src/denglert/PKPCorrelationAna/results/Fiji_MinBias_HighMult_Full_trkCorr_yes_ContMatrix_yes/dump.root";
+// std::string phi_res = "/afs/cern.ch/work/d/denglert/public/projects/PhiMesonCorrel_Nemo/CMSSW_5_3_20/src/denglert/PhiMesonCorrel/results/Control_HighMult_Full_singlebin_trkCorr_no_temp_fit/dump.root";
+// std::string phi_res = "/afs/cern.ch/work/d/denglert/public/projects/PhiMesonCorrel_Nemo/CMSSW_5_3_20/src/denglert/PhiMesonCorrel/results/PIDscan_MinBias_dEdxminsweep_full_2nd_config_0_trkCorr_no_fit/dump.root";
+ std::string phi_res = Form("/afs/cern.ch/work/d/denglert/public/projects/PhiMesonCorrel_Nemo/CMSSW_5_3_20/src/denglert/PhiMesonCorrel/results/%s/dump.root", tag.c_str());
+ 
+ int mult_pkp1;
+ int mult_pkp2;
+ int mult_phi1;
+ int mult_phi2;
 
+ mult_pkp1 = 120;
+ mult_pkp2 = 150;
+ mult_phi1 = 120;
+ mult_phi2 = 180;
+ CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
+// int mult_phi1 = 120;
+// int mult_phi2 = 260;
+ mult_pkp1 = 185;
+ mult_pkp2 = 220;
+ mult_phi1 = 180;
+ mult_phi2 = 260;
+ CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
 
 }

@@ -27,7 +27,7 @@ int main( int argc, const char *argv[] )
  std::string inpFilename = argv[1];
  std::string isMC        = argv[2];
  TString dotrkCorr_str 	 = argv[3];
- TString trkCorrFilename = argv[4];
+ std::string trkCorrFilename = argv[4];
  std::string PIDconfig   = argv[5];
  std::string tag		    = argv[6];
  int nEvMax 	  		    = atoi( argv[7] );
@@ -84,9 +84,13 @@ int main( int argc, const char *argv[] )
  setupTrackTree(trackTree, tTracks);
 
  // hiEvtAnalyzer
- TTree *EvtAna= (TTree*)f->Get("hiEvtAnalyzer/HiTree");
+ TTree *EvtAna = NULL; 
+ std::cout << "EvtAnA: (before load)" << EvtAna << std::endl;
+ EvtAna = (TTree*)f->Get("hiEvtAnalyzer/HiTree");
  int hiNtracks; EvtAna->SetBranchAddress("hiNtracks", &hiNtracks);
  float vz; EvtAna->SetBranchAddress("vz", &vz);
+
+ std::cout << "EvtAnA: (after load)" << EvtAna << std::endl;
 
  // Event Selection (SkimAnalysis)
  EvtSelection EvSel;
@@ -134,9 +138,9 @@ int main( int argc, const char *argv[] )
 
  // TrackCorrection file
  TFile *f_trkCorr = NULL; 
- f_trkCorr = new TFile(trkCorrFilename, "READ");
+ f_trkCorr = new TFile(trkCorrFilename.c_str(), "READ");
  if ( (f_trkCorr->IsZombie()) || (f_trkCorr == NULL) ) {std::cerr << "Error opening file: " << trkCorrFilename << std::endl; exit(-1);}
- else {std::cout << "trkCorr File successfully opened." << std::endl;}
+ else {std::cout << Form("trkCorr file %s successfully opened.", trkCorrFilename.c_str()) << std::endl;}
 
  TrackCorr *trkCorr = new TrackCorr;
  trkCorr->table = Read_TH3D_1Darray(f_trkCorr, "hcorr3D typ", nCorrTyp);
@@ -149,16 +153,20 @@ int main( int argc, const char *argv[] )
  else {std::cerr << "dotrkCorr not defined." << std::endl; exit(-1);}
 
  trkCorr->DoTrackWeight = dotrkCorr;
+
+ std::cerr << "detaching trkCorr" << std::endl;
  for (int i = 0; i < nCorrTyp ; i++)
  { trkCorr->table[i]->SetDirectory(0); }
 
  f_trkCorr->Close();
+ std::cerr << "trkCorr file closed." << std::endl;
 
  // EventData
  EventData *ev;
  ev = new EventData;
 
  ev->Setup_nTriggerParticles(nCorrTyp, nPtBins);
+ std::cerr << "TriggerParticles set up " << std::endl;
 
  ///////////////////////////////////////////
  //                                       //
@@ -218,7 +226,6 @@ int main( int argc, const char *argv[] )
 				trk.w0 = trkCorr->trackWeight( 0 , pt, eta, phi); 
 				
 		  		// Track fill up
-				trk.pid 		= 0;
 		  		trk.charge  = tTracks.trkCharge[iTrk];
 		  		trk.phi     = phi;
 		  		trk.eta     = eta;
@@ -286,8 +293,6 @@ int main( int argc, const char *argv[] )
 	CFW.nEvents_Processed_signal_total->Fill(0.);
 	if ( multiplicitybin_Ana(hiNtracks, nMultiplicityBins_Ana) == -1) continue;
 
-	int multBin = multiplicitybin_Ana(hiNtracks, nMultiplicityBins_Ana);
-
  	ev->Clear(nCorrTyp, nPtBins);
 
 	ev->EventID = iEvA;
@@ -305,7 +310,7 @@ int main( int argc, const char *argv[] )
 	trackTree->GetEntry(iEvA);
 
 	// Read in event
-	ev->ReadInDATA(tTracks, pidutil, trkCorr);
+	ev->ReadInDATA(tTracks, pidutil, trkCorr, CFW.spectrum);
 
 	CFW.SignalCorrelation(ev);
 	CFW.MixedCorrelation(ev, EventCache_ptr);
