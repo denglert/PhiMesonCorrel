@@ -10,6 +10,8 @@
 #include "ALICERes.h"
 #include "GraphTools.h"
 
+
+const double massPhi = 1.019461;
 const double ptshifts[3] = { -0.01, 0.00, 0.01};
 
 void CorrelationFramework::RemovePoint( int point )
@@ -58,6 +60,10 @@ void CorrelationFramework::Save( )
 
 void CorrelationFramework::SetupTGraphs( )
 {
+
+	TGraph_sig2bkgr = new TGraphErrors*[nMultiplicityBins_Ana];
+	TGraph_dmass 	 = new TGraphErrors*[nMultiplicityBins_Ana];
+
 	TGraph_phimv2vspt_low = new TGraphErrors*[nMultiplicityBins_Ana];
    TGraph_phimv2vspt_avg = new TGraphErrors*[nMultiplicityBins_Ana];
    TGraph_phimv2vspt_hig = new TGraphErrors*[nMultiplicityBins_Ana];
@@ -83,6 +89,10 @@ void CorrelationFramework::SetupTGraphs( )
 		double **v2_unsubtracted;
 		double **v2_unsubtracted_StatError;
 
+		double sig2bkgr[nPtBins[0]];
+		double sig2bkgr_StatError[nPtBins[0]];
+		double dmass[nPtBins[0]];
+		double dmass_StatError[nPtBins[0]];
 
 		pt       	 = new double*[nCorrTyp];
 		dpt       	 = new double*[nCorrTyp];
@@ -123,6 +133,18 @@ void CorrelationFramework::SetupTGraphs( )
 
 		}
 
+			for(int ptBin = 0; ptBin < nPtBins[0]; ptBin++)
+			{
+
+					sig2bkgr          [ptBin] 	=  spectruminf[ptBin][multBin].sigtobkgrViaFit;
+					sig2bkgr_StatError[ptBin] 	=  spectruminf[ptBin][multBin].sigtobkgrViaFit_error;
+					dmass              [ptBin] = (spectruminf[ptBin][multBin].mass - massPhi)*1000;
+					dmass_StatError    [ptBin] =  spectruminf[ptBin][multBin].mass_error*1000;
+			}
+
+			TGraph_sig2bkgr[multBin] = Get_TGraph_sig2bkgr(nPtBins[0], pt[0], sig2bkgr, 0, sig2bkgr_StatError);
+			TGraph_dmass[multBin] 	 = Get_TGraph_dmass(nPtBins[0], pt[0], dmass, 0, dmass_StatError);
+
 			TGraph_phimv2vspt_low[multBin] = phim_v2(nPtBins[0], pt[0], v2[0], 0, v2_StatError[0] );
 			TGraph_phimv2vspt_avg[multBin] = phim_v2(nPtBins[1], pt[1], v2[1], 0, v2_StatError[1] ); 
 			TGraph_phimv2vspt_hig[multBin] = phim_v2(nPtBins[2], pt[2], v2[2], 0, v2_StatError[2] ); 
@@ -150,6 +172,104 @@ void CorrelationFramework::SetupTGraphs( )
 			TGraph_phimv2vspt_hig_SystError[multBin]->SetName( Form("phimv2vspt_hig_SystError_Ntrk_%03d-%03d", mult1, mult2) );
 
 	}
+
+}
+
+////////////////////////////////////////
+// - makeFigPhiv2vspT_lowavghig
+void CorrelationFramework::makeFigsig2bkgr( )
+{
+
+	gStyle->SetOptStat(0);
+
+	// *** Plotting the graphs *** //
+	gStyle->SetPadTickY(1);
+	gStyle->SetPadTickX(1);
+
+	TCanvas *canvas = GetCanvas();
+
+	TGraph_sig2bkgr[0]->Draw("AP");
+
+
+	TLatex **tmultlabel = new TLatex*[10];
+
+	for (int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{
+
+	   int mult1 = multiplicity_Ana(multBin, 0, nMultiplicityBins_Ana);
+		int mult2 = multiplicity_Ana(multBin, 1, nMultiplicityBins_Ana);
+
+		double *x = TGraph_sig2bkgr[multBin]->GetX();
+		double *y = TGraph_sig2bkgr[multBin]->GetY();
+		double *y_error = TGraph_sig2bkgr[multBin]->GetEY();
+	
+		TGraph_sig2bkgr[multBin]->SetMarkerColor(Colors_Mult[multBin]);
+		TGraph_sig2bkgr[multBin]->SetLineColor(Colors_Mult[multBin]);
+		TGraph_sig2bkgr[multBin]->SetMarkerStyle(23);
+		TGraph_sig2bkgr[multBin]->Draw("P");
+
+		tmultlabel[multBin] = label_multBinPtr( sig2bkgr_multlabel_x1, (sig2bkgr_multlabel_y1-(multBin*sig2bkgr_multlabel_shift)), figuretextsize, multBin );
+		tmultlabel[multBin]->SetTextColor(Colors_Mult[multBin]);
+		tmultlabel[multBin]->Draw();
+
+	}
+
+	TLatex tlabel_CMS_pPb = label_CMS_pPb( v2vspt_CMSsystemlabel_x1, v2vspt_CMSsystemlabel_y1, figuretextsize);
+	tlabel_CMS_pPb.Draw();
+
+	std::string dir  = Form("./results/%s/spectrum/", tag.c_str());
+	std::string label = Form("sig2bkgr"); 
+	std::string	pngfigure = dir+label+".png";
+	std::string	pdffigure = dir+label+".pdf";
+	canvas->SaveAs( pngfigure.c_str() );
+	canvas->SaveAs( pdffigure.c_str() );
+
+}
+
+////////////////////////////////////////
+// - makeFigPhiv2vspT_lowavghig
+void CorrelationFramework::makeFigdMass( )
+{
+
+	gStyle->SetOptStat(0);
+
+	// *** Plotting the graphs *** //
+	gStyle->SetPadTickY(1);
+	gStyle->SetPadTickX(1);
+
+	TCanvas *canvas = GetCanvas();
+
+	TGraph_dmass[0]->Draw("AP");
+
+	TLatex **tmultlabel = new TLatex*[10];
+
+	for (int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
+	{
+
+   int mult1 = multiplicity_Ana(multBin, 0, nMultiplicityBins_Ana);
+	int mult2 = multiplicity_Ana(multBin, 1, nMultiplicityBins_Ana);
+
+	TGraph_dmass[multBin]->SetMarkerColor(Colors_Mult[multBin]);
+	TGraph_dmass[multBin]->SetLineColor(Colors_Mult[multBin]);
+	TGraph_dmass[multBin]->SetMarkerStyle(23);
+	TGraph_dmass[multBin]->Draw("P");
+
+	tmultlabel[multBin] = label_multBinPtr( dmass_multlabel_x1, (dmass_multlabel_y1-(multBin*dmass_multlabel_shift)), figuretextsize, multBin );
+	tmultlabel[multBin]->SetTextColor(Colors_Mult[multBin]);
+	tmultlabel[multBin]->Draw("SAME");
+
+	}
+
+	TLatex tlabel_CMS_pPb = label_CMS_pPb( dmass_CMSsystemlabel_x1, dmass_CMSsystemlabel_y1, figuretextsize);
+	tlabel_CMS_pPb.Draw();
+
+	std::string dir  = Form("./results/%s/spectrum/", tag.c_str());
+	std::string label = Form("dmass"); 
+	std::string	pngfigure = dir+label+".png";
+	std::string	pdffigure = dir+label+".pdf";
+	canvas->SaveAs( pngfigure.c_str() );
+	canvas->SaveAs( pdffigure.c_str() );
+
 
 }
 
@@ -194,9 +314,9 @@ void CorrelationFramework::makeFigPhiv2vspT_lowavghig( int multBin )
 
 	v2vsptlegend.SetFillStyle(0);
 	v2vsptlegend.SetBorderSize(0);
-	v2vsptlegend.AddEntry( TGraph_phimv2vspt_low[multBin],"#Phi_{sub,low}}", "P");
-	v2vsptlegend.AddEntry( TGraph_phimv2vspt_avg[multBin],"#Phi_{sub,avg}}", "P");
-	v2vsptlegend.AddEntry( TGraph_phimv2vspt_hig[multBin],"#Phi_{sub,hig}}", "P");
+	v2vsptlegend.AddEntry( TGraph_phimv2vspt_low[multBin],"#Phi_{sub,low}", "P");
+	v2vsptlegend.AddEntry( TGraph_phimv2vspt_avg[multBin],"#Phi_{sub,avg}", "P");
+	v2vsptlegend.AddEntry( TGraph_phimv2vspt_hig[multBin],"#Phi_{sub,hig}", "P");
 	v2vsptlegend.SetTextSize(figuretextsize);
 	v2vsptlegend.Draw("SAME");
 
@@ -286,7 +406,7 @@ void CorrelationFramework::makeFigPhiv2vspT_control( int multBin )
 	
 ////////////////////////////////////////
 // - makeFigPhiv2vspT_lowavghig
-void CorrelationFramework::makeFigCombinedResults( const char pkp_res_path[], const char phi_res_path[], int mult_pkp1, int mult_pkp2, int mult_phi1, int mult_phi2, const char figtag[] )
+void CorrelationFramework::makeFigCombinedResults( const char pkp_res_path[], const char phi_res_path[], int mult_pkp1, int mult_pkp2, int mult_pkp1_l, int mult_pkp2_l, int mult_phi1, int mult_phi2, const char figtag[] )
 {
  // Open file
  TFile *f_pkp = NULL;
@@ -345,19 +465,19 @@ void CorrelationFramework::makeFigCombinedResults( const char pkp_res_path[], co
  
  v2vsptlegend.SetFillStyle(0);
  v2vsptlegend.SetBorderSize(0);
- v2vsptlegend.AddEntry( cpar,"charged", "P");
- v2vsptlegend.AddEntry( pion,"#pi", "P");
- v2vsptlegend.AddEntry( kaon,"K", "P");
- v2vsptlegend.AddEntry( prot,"p", "P");
- v2vsptlegend.AddEntry( phim,"#Phi", "P");
+ v2vsptlegend.AddEntry( cpar,"charged", "P" );
+ v2vsptlegend.AddEntry( pion,"#pi", "P" );
+ v2vsptlegend.AddEntry( kaon,"K", "P" );
+ v2vsptlegend.AddEntry( prot,"p", "P" );
+ v2vsptlegend.AddEntry( phim,"#Phi", "P" );
  v2vsptlegend.SetTextSize(figuretextsize);
  v2vsptlegend.Draw("SAME");
  
  TLatex tlabel_CMS_pPb = label_CMS_pPb( v2vspt_CMSsystemlabel_x1, v2vspt_CMSsystemlabel_y1, figuretextsize);
  tlabel_CMS_pPb.Draw();
  
- TLatex tmultlabel1 = label_multBin( v2vspt_multlabel_x1-0.1, v2vspt_multlabel_y1,      figuretextsize, mult_pkp1, mult_pkp2, "#Phi:      :");
- TLatex tmultlabel2 = label_multBin( v2vspt_multlabel_x1-0.1, v2vspt_multlabel_y1-0.07, figuretextsize, mult_phi1, mult_phi2, "#pi, K, p:");
+ TLatex tmultlabel1 = label_multBin( v2vspt_multlabel_x1-0.1, v2vspt_multlabel_y1,      figuretextsize, mult_phi1, mult_phi2, "#Phi:      :");
+ TLatex tmultlabel2 = label_multBin( v2vspt_multlabel_x1-0.1, v2vspt_multlabel_y1-0.07, figuretextsize, mult_pkp1_l, mult_pkp2_l, "#pi, K, p:");
 
  tmultlabel1.Draw();
  tmultlabel2.Draw();

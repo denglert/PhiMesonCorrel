@@ -89,6 +89,11 @@ int main( int argc, const char *argv[] )
  CFW.Calcvns();
  CFW.SetupTGraphs();
 
+ CFW.RemovePoint(0);
+
+ CFW.makeFigsig2bkgr();
+ CFW.makeFigdMass( );
+
  // Make figures
  for(int multBin=0; multBin < nMultiplicityBins_Ana; multBin++)
  {
@@ -107,7 +112,6 @@ int main( int argc, const char *argv[] )
 ////////////////////////////////
  // ***** Setting output ***** //
  ////////////////////////////////
- CFW.RemovePoint(0);
 
  CFW.Save();
 
@@ -119,20 +123,31 @@ int main( int argc, const char *argv[] )
  
  int mult_pkp1;
  int mult_pkp2;
+ int mult_pkp1_l;
+ int mult_pkp2_l;
  int mult_phi1;
  int mult_phi2;
 
+ mult_pkp1 = 100;
+ mult_pkp2 = 120;
+ mult_pkp1_l = mult_pkp1;
+ mult_pkp2_l = mult_pkp2;
+ mult_phi1 = 0;
+ mult_phi2 = 120;
+ CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_pkp1_l, mult_pkp2_l, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
  mult_pkp1 = 120;
  mult_pkp2 = 150;
+ mult_pkp1_l = mult_pkp1;
+ mult_pkp2_l = mult_pkp2;
  mult_phi1 = 120;
  mult_phi2 = 180;
- CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
-// int mult_phi1 = 120;
-// int mult_phi2 = 260;
+ CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_pkp1_l, mult_pkp2_l, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
  mult_pkp1 = 185;
  mult_pkp2 = 220;
+ mult_pkp1_l = 180;
+ mult_pkp2_l = 220;
  mult_phi1 = 180;
  mult_phi2 = 260;
- CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
+ CFW.makeFigCombinedResults(pkp_res.c_str(), phi_res.c_str(), mult_pkp1, mult_pkp2, mult_pkp1_l, mult_pkp2_l, mult_phi1, mult_phi2, Form("_pkp_%03d-%03d_phi_%03d-%03d", mult_pkp1, mult_pkp2, mult_phi1, mult_phi2) );
 
 }

@@ -132,11 +132,11 @@ const float assoptmax = 3.0;
 // };
 
 // MC comparison
-const int nMultiplicityBins_Ana_HDR = 1;
-const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
-{
-	  {   0,  120 }
-};
+//const int nMultiplicityBins_Ana_HDR = 1;
+//const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
+//{
+//	  {   0,  120 }
+//};
 
 
 // Single HighMult Bin
@@ -162,6 +162,17 @@ const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] =
 //	  {   0,  60 },
 //	  {  60, 120 }
 //};
+
+// MinBias HighMult
+const int nMultiplicityBins_Ana_HDR = 3;
+const int multiplicitybins_Ana[nMultiplicityBins_Ana_HDR][2] = 
+{
+	  {   0, 120 },
+	  { 120, 180 },
+	  { 180, 260 },
+//	  { 260, 300 }
+////////	  { 300, 350 }
+};
 
 // HIGH-MULTIPLICITY
 //const int nMultiplicityBins_Ana_HDR = 2;

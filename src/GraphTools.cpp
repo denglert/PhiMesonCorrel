@@ -47,9 +47,56 @@ TCanvas *GetCanvas ()
 	return canvas;
 }
 
+////////////////
+// mass
+TGraphErrors *Get_TGraph_dmass (int npoint, double *pt, double *dmass, double *pt_Error, double *dmass_Error )
+{ 
+	TGraphErrors *graph = new TGraphErrors(npoint, pt, dmass, pt_Error, dmass_Error);
+	graph->SetTitle("");
+	graph->SetLineColor(kMagenta);
+	graph->SetMarkerColor(kMagenta);
+	// full circle
+	graph->SetMarkerStyle(21);
+	graph->SetMarkerSize(1);
+   graph->GetXaxis()->SetLimits(dmass_ptmin,dmass_ptmax);
+	graph->GetXaxis()->SetTitle("p_{T} [GeV/c]");                              			  
+	graph->GetXaxis()->CenterTitle(1);
+	graph->GetXaxis()->SetTitleOffset(1.2);
+	graph->GetXaxis()->SetTitleSize(figuretextsize);
+	graph->GetYaxis()->SetRangeUser(dmass_min,dmass_max);
+	graph->GetYaxis()->SetTitle("m_{#Phi,fit} - m_{#Phi,PDG}[MeV]");
+	graph->GetYaxis()->CenterTitle(1);
+	graph->GetYaxis()->SetTitleOffset(1.2);
+	graph->GetYaxis()->SetTitleSize(figuretextsize);
+	return graph;
+};
+
+////////////////
+//  sig2bkgr
+TGraphErrors *Get_TGraph_sig2bkgr (int npoint, double *pt, double *sig2bkgr, double *pt_Error, double *sig2bkgr_Error )
+{ 
+	TGraphErrors *graph = new TGraphErrors(npoint, pt, sig2bkgr, pt_Error, sig2bkgr_Error);
+	graph->SetTitle("");
+	graph->SetLineColor(kMagenta);
+	graph->SetMarkerColor(kMagenta);
+	// full circle
+	graph->SetMarkerStyle(21);
+	graph->SetMarkerSize(1);
+   graph->GetXaxis()->SetLimits(sig2bkgr_ptmin,sig2bkgr_ptmax);
+	graph->GetXaxis()->SetTitle("p_{T} [GeV/c]");                              			  
+	graph->GetXaxis()->CenterTitle(1);
+	graph->GetXaxis()->SetTitleOffset(1.2);
+	graph->GetXaxis()->SetTitleSize(figuretextsize);
+	graph->GetYaxis()->SetRangeUser(sig2bkgr_min,sig2bkgr_max);
+	graph->GetYaxis()->SetTitle("S/B");
+	graph->GetYaxis()->CenterTitle(1);
+	graph->GetYaxis()->SetTitleOffset(1.2);
+	graph->GetYaxis()->SetTitleSize(figuretextsize);
+	return graph;
+};
 
 ///////////////////////////////
-// cpar_v2
+// phim_v2
 TGraphErrors *phim_v2 (int npoint, double *pt, double *v2, double *pt_Error, double *v2_Error )
 { 
 	TGraphErrors *graph = new TGraphErrors(npoint, pt, v2, pt_Error, v2_Error);
@@ -254,6 +301,22 @@ TLatex label_multBin(double posx, double posy, double figuretextsize, int multBi
 
 	return tlabel;
 }
+
+TLatex *label_multBinPtr(double posx, double posy, double figuretextsize, int multBin)
+{
+
+	int mult1 = multiplicity_Ana(multBin, 0, nMultiplicityBins_Ana_HDR);
+	int mult2 = multiplicity_Ana(multBin, 1, nMultiplicityBins_Ana_HDR);
+
+	std::string binlabel = Form("%d #leq N_{trk}^{offline} #leq %d", mult1, mult2);
+
+	TLatex *tlabel = new TLatex( posx, posy, binlabel.c_str()); 
+	tlabel->SetTextSize(figuretextsize);
+	tlabel->SetNDC(kTRUE);
+
+	return tlabel;
+}
+
 
 TLatex label_multBin(double posx, double posy, double figuretextsize, int minNtrk, int maxNtrk, const char pre[])
 {

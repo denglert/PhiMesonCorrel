@@ -561,7 +561,6 @@ void CorrelationFramework::Calcvns()
 		double V3_can_Err    = correl1D_FitResults[1][ptBin][multBin].V3_Error;
 		double V3_hig_Err    = correl1D_FitResults[2][ptBin][multBin].V3_Error;
 
-		// WARNING warning Warning
 		double s2b    = spectruminf[ptBin][multBin].sigtobkgrViaFit;
 		double c2a0   = (1. + 1./s2b);
 		double da02a0 = spectruminf[ptBin][multBin].signalViaFitEntries_error/spectruminf[ptBin][multBin].signalViaFitEntries;

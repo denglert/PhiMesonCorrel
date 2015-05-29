@@ -4,5 +4,4 @@
 // *** Physics parameters *** //
 ////////////////////////////////
 
-const double massA = 0.493677;
-const double massB = 0.493677;
+const double phiM = 0.493677;
